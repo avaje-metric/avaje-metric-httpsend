@@ -1,4 +1,4 @@
-avaje-metric-httpreporter
+avaje-metric-httpsend
 =========================
 
-Reports collected statistics via https to remote repository
+Reports collected statistics via http(s) to remote repository
