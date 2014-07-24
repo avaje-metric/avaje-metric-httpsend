@@ -1,20 +1,13 @@
 package org.avaje.metric.httpsend;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
 
+import com.squareup.okhttp.*;
 import org.avaje.metric.Metric;
 import org.avaje.metric.report.MetricReporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.squareup.okhttp.OkHttpClient;
 
 /**
  * Http(s) based Reporter that sends JSON formatted metrics message to a Repo server.
@@ -22,66 +15,80 @@ import com.squareup.okhttp.OkHttpClient;
 public class HttpSendReporter implements MetricReporter {
 
   protected final Logger log = LoggerFactory.getLogger(HttpSendReporter.class);
-  
+
+  private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
   protected final OkHttpClient client = new OkHttpClient();
 
   protected URL url;
-  
+
   protected String key;
-  
+
   protected String app;
-  
+
   protected String env;
-  
+
   protected String server;
-  
+
   public HttpSendReporter() {
-    
+
   }
-  
+
   public void setUrl(URL url) {
     this.url = url;
   }
 
   public void setKey(String key) {
-    this.key = makeJsonSafe(key);
+    this.key = stripQuotes(key);
   }
 
   public void setApp(String app) {
-    this.app = makeJsonSafe(app);
+    this.app = stripQuotes(app);
   }
 
   public void setEnv(String env) {
-    this.env = makeJsonSafe(env);
+    this.env = stripQuotes(env);
   }
 
   public void setServer(String server) {
-    this.server = makeJsonSafe(server);
+    this.server = stripQuotes(server);
   }
 
 
   public void report(List<Metric> metrics) {
-    
-    String json = buildJsonPayload(metrics);
-    
+
+    long collectionTime = System.currentTimeMillis();
+    String json = buildJsonPayload(metrics, collectionTime);
+
     if (log.isTraceEnabled()) {
-      log.trace("Sending:\n"+json);
+      log.trace("Sending:\n {}", json);
     }
-    
+
     try {
-      String responseMessage = postJson(json.getBytes("UTF-8"));
-      if (!"ok".equals(responseMessage)) {
-        log.info("Did not get ok response, storing message for resend");
+
+      RequestBody body = RequestBody.create(JSON, json);
+      Request request = new Request.Builder()
+        .url(url)
+        .post(body)
+        .build();
+
+      Response response = client.newCall(request).execute();
+      if (!response.isSuccessful()) {
+        log.info("Unsuccessful sending metrics payload to server");
         storeJsonForResend(json);
       }
+
     } catch (Exception e) {
       // store json message in a file to resend later...
-      log.error("Exception sending metrics, storing message for resend", e);
+      log.error("Exception sending metrics to server", e);
       storeJsonForResend(json);
     }
   }
-  
-  protected String makeJsonSafe(String value) {
+
+  /**
+   * Trim out single and double quotes from our key header values.
+   */
+  protected String stripQuotes(String value) {
     if (value == null) {
       return null;
     }
@@ -90,57 +97,17 @@ public class HttpSendReporter implements MetricReporter {
   }
 
   protected void storeJsonForResend(String json) {
-    //TODO: storeJsonForResend
-    log.info("Storing message for resend");
+    // currently not doing this;
   }
 
-  protected String buildJsonPayload(List<Metric> metrics) {
-    
-    JsonMetricVisitor jsonVisitor = new JsonMetricVisitor();
-    return jsonVisitor.buildJson(this, metrics);    
+  protected String buildJsonPayload(List<Metric> metrics, long collectionTime) {
+
+    JsonMetricVisitor jsonVisitor = new JsonMetricVisitor(collectionTime);
+    return jsonVisitor.buildJson(this, metrics);
   }
 
-  
   public void cleanup() {
     // Do nothing
-  }
-  
-  /**
-   * Light weight http(s) post of JSON content to repo server.
-   */
-  protected String postJson(byte[] body) throws IOException {
-    
-    HttpURLConnection connection = client.open(url);
-    OutputStream out = null;
-    InputStream in = null;
-    try {
-      // Write the request.
-      connection.setRequestMethod("POST");
-      connection.setDoInput(true);
-
-      connection.addRequestProperty("Content-Type", "application/json");
-
-      out = connection.getOutputStream();
-      out.write(body);
-      out.close();
-
-      // Read the response.
-      if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-        throw new IOException("Unexpected HTTP response: " + connection.getResponseCode() + " " + connection.getResponseMessage());
-      }
-      in = connection.getInputStream();
-      return readFirstLine(in);
-      
-    } finally {
-      // Clean up.
-      if (out != null) out.close();
-      if (in != null) in.close();
-    }
-  }
-  
-  protected String readFirstLine(InputStream in) throws IOException {
-    BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
-    return reader.readLine();
   }
 
 }

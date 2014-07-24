@@ -1,16 +1,10 @@
 package org.avaje.metric.httpsend;
 
-import java.util.List;
 
-import org.avaje.metric.CounterMetric;
-import org.avaje.metric.CounterStatistics;
-import org.avaje.metric.GaugeMetric;
-import org.avaje.metric.GaugeMetricGroup;
-import org.avaje.metric.Metric;
-import org.avaje.metric.TimedMetric;
-import org.avaje.metric.ValueMetric;
-import org.avaje.metric.ValueStatistics;
-import org.avaje.metric.report.MetricVisitor;
+import org.avaje.metric.*;
+import org.avaje.metric.filereport.NumFormat;
+
+import java.util.List;
 
 /**
  * Writes the metric information as JSON to a buffer for sending.
@@ -21,13 +15,19 @@ public class JsonMetricVisitor implements MetricVisitor {
 
   protected final StringBuilder buffer;
 
-  public JsonMetricVisitor() {
-    this.buffer = new StringBuilder(500);
-    this.decimalPlaces = 2;
+  protected long collectionTime;
+
+  public JsonMetricVisitor(long collectionTime) {
+    this(collectionTime, 1000);
+  }
+
+  public JsonMetricVisitor(long collectionTime, int bufferSize) {
+    this(collectionTime, new StringBuilder(bufferSize));
   }
   
-  public JsonMetricVisitor(StringBuilder writer) {
-    this.buffer = writer;
+  public JsonMetricVisitor(long collectionTime, StringBuilder buffer) {
+    this.collectionTime = collectionTime;
+    this.buffer = buffer;
     this.decimalPlaces = 2;
   }
 
@@ -52,7 +52,7 @@ public class JsonMetricVisitor implements MetricVisitor {
         buffer.append(" ,");
       }
       Metric metric = metrics.get(i);
-      metric.visitCollectedStatistics(this);
+      metric.visit(this);
       buffer.append("\n");
     }
   }
@@ -65,7 +65,6 @@ public class JsonMetricVisitor implements MetricVisitor {
   protected void appendHeader(HttpSendReporter reporter) {
     
     writeHeader("time", System.currentTimeMillis());
-    writeHeader("key", reporter.key);
     writeHeader("app", reporter.app);
     writeHeader("env", reporter.env);
     writeHeader("server", reporter.server);
@@ -127,7 +126,7 @@ public class JsonMetricVisitor implements MetricVisitor {
         buffer.append(", ");
       }
       GaugeMetric m = gaugeMetrics[i];
-      writeKeyNumber(m.getName().getName(), m.getFormattedValue(decimalPlaces));
+      writeKeyNumber(m.getName().getName(), format(m.getValue()));
     }
     buffer.append("]");
     writeMetricEnd(gaugeMetricGroup);
@@ -137,11 +136,36 @@ public class JsonMetricVisitor implements MetricVisitor {
   public void visit(GaugeMetric metric) {
 
     writeMetricStart("gauge", metric);
-    writeKeyNumber("value", metric.getFormattedValue(decimalPlaces));
+    writeKeyNumber("value", format(metric.getValue()));
     writeMetricEnd(metric);
   }
 
-  protected void writeSummary(String prefix, ValueStatistics valueStats) {
+    @Override
+    public void visit(GaugeCounterMetric metric) {
+      writeMetricStart("gaugeCounter", metric);
+      writeKeyNumber("value", metric.getValue());
+      writeMetricEnd(metric);
+    }
+
+    @Override
+    public void visit(GaugeCounterMetricGroup gaugeMetricGroup) {
+
+      GaugeCounterMetric[] gaugeMetrics = gaugeMetricGroup.getGaugeMetrics();
+      writeMetricStart("gaugeCounterGroup", gaugeMetricGroup);
+      writeKey("group");
+      buffer.append("[");
+      for (int i = 0; i < gaugeMetrics.length; i++) {
+        if (i > 0) {
+          buffer.append(", ");
+        }
+        GaugeCounterMetric m = gaugeMetrics[i];
+        writeKeyNumber(m.getName().getName(), m.getValue());
+      }
+      buffer.append("]");
+      writeMetricEnd(gaugeMetricGroup);
+    }
+
+    protected void writeSummary(String prefix, ValueStatistics valueStats) {
 
     long count = valueStats.getCount();
     writeKey(prefix);
@@ -162,8 +186,8 @@ public class JsonMetricVisitor implements MetricVisitor {
     buffer.append("}");
   }
 
-  protected void writeKeyNumber(String key, double numberValue) {
-    writeKeyNumber(key, String.valueOf(numberValue));
+  protected String format(double value) {
+    return NumFormat.dp(decimalPlaces, value);
   }
 
   protected void writeKeyNumber(String key, long numberValue) {

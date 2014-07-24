@@ -5,13 +5,11 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.avaje.metric.CounterMetric;
-import org.avaje.metric.Gauge;
-import org.avaje.metric.GaugeMetric;
-import org.avaje.metric.Metric;
-import org.avaje.metric.MetricName;
-import org.avaje.metric.TimedMetric;
-import org.avaje.metric.ValueMetric;
+import org.avaje.metric.*;
+import org.avaje.metric.core.DefaultCounterMetric;
+import org.avaje.metric.core.DefaultGaugeMetric;
+import org.avaje.metric.core.DefaultTimedMetric;
+import org.avaje.metric.core.DefaultValueMetric;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -22,10 +20,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class JsonBasicTest {
+public class JsonMetricVisitorTest {
 
   private JsonMetricVisitor newJsonMetricVisitor() {
-    return new JsonMetricVisitor();
+    return new JsonMetricVisitor(System.currentTimeMillis());
   }
   
   @Test
@@ -38,7 +36,7 @@ public class JsonBasicTest {
     jsonVisitor.visit(counter);
     String counterJson = jsonVisitor.getBufferValue();
     
-    Assert.assertEquals("{\"type\":\"counter\",\"name\":\"org.test.Foo.doStuff\",\"count\":10,\"dur\":0}", counterJson);
+    Assert.assertEquals("{\"type\":\"counter\",\"name\":\"org.test.CounterFoo.doStuff\",\"count\":10,\"dur\":0}", counterJson);
   }
 
   
@@ -51,7 +49,7 @@ public class JsonBasicTest {
     jsonVisitor.visit(metric);
     String counterJson = jsonVisitor.getBufferValue();
     
-    Assert.assertEquals("{\"type\":\"gauge\",\"name\":\"org.test.Foo.doStuff\",\"value\":24.0}", counterJson);
+    Assert.assertEquals("{\"type\":\"gauge\",\"name\":\"org.test.GaugeFoo.doStuff\",\"value\":24.0}", counterJson);
   }
 
   @Test
@@ -64,7 +62,7 @@ public class JsonBasicTest {
     jsonVisitor.visit(metric);
     String counterJson = jsonVisitor.getBufferValue();
     
-    Assert.assertEquals("{\"type\":\"value\",\"name\":\"org.test.Foo.doStuff\",\"n\":{\"count\":3,\"avg\":14,\"max\":16,\"sum\":42,\"dur\":0}}", counterJson);
+    Assert.assertEquals("{\"type\":\"value\",\"name\":\"org.test.ValueFoo.doStuff\",\"n\":{\"count\":3,\"avg\":14,\"max\":16,\"sum\":42,\"dur\":0}}", counterJson);
   }
 
   
@@ -79,11 +77,11 @@ public class JsonBasicTest {
     String counterJson = jsonVisitor.getBufferValue();
     
     // values converted into milliseconds
-    Assert.assertEquals("{\"type\":\"timed\",\"name\":\"org.test.Foo.doStuff\",\"n\":{\"count\":3,\"avg\":120,\"max\":140,\"sum\":360,\"dur\":0},\"e\":{\"count\":2,\"avg\":210,\"max\":220,\"sum\":420,\"dur\":0}}", counterJson);
+    Assert.assertEquals("{\"type\":\"timed\",\"name\":\"org.test.TimedFoo.doStuff\",\"n\":{\"count\":3,\"avg\":120,\"max\":140,\"sum\":360,\"dur\":0},\"e\":{\"count\":2,\"avg\":210,\"max\":220,\"sum\":420,\"dur\":0}}", counterJson);
   }
 
   @Test
-  public void testMetricList() throws JsonParseException, JsonMappingException, IOException {
+  public void testMetricList() throws IOException {
     
     List<Metric> metrics = new ArrayList<Metric>();
     metrics.add(createValueMetric());
@@ -104,8 +102,7 @@ public class JsonBasicTest {
     System.out.println("---");
     System.out.println(json);
     System.out.println("---");
-    
-    Assert.assertTrue(json.contains("\"key\":\"key-val\""));
+
     Assert.assertTrue(json.contains("\"env\":\"dev\""));
     Assert.assertTrue(json.contains("\"app\":\"app-val\""));
     Assert.assertTrue(json.contains("\"server\":\"server-val\""));
@@ -113,7 +110,6 @@ public class JsonBasicTest {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode jsonObject = mapper.readValue(json, ObjectNode.class);
     
-    Assert.assertEquals("key-val",jsonObject.get("key").asText());
     Assert.assertEquals("dev",jsonObject.get("env").asText());
     Assert.assertEquals("app-val",jsonObject.get("app").asText());
     Assert.assertEquals("server-val",jsonObject.get("server").asText());
@@ -124,14 +120,14 @@ public class JsonBasicTest {
     
     boolean sendToLocalServer = true;
     if (sendToLocalServer) {
-      reporter.setUrl(new URL("http://127.0.0.1:8090/"));
+      reporter.setUrl(new URL("http://127.0.0.1:8090/message/hello"));
       reporter.report(metrics);
     }
   }
   
 
   private CounterMetric createCounterMetric() {
-    CounterMetric counter = new CounterMetric(MetricName.parse("org.test.Foo.doStuff"));
+    CounterMetric counter = new DefaultCounterMetric(MetricManager.nameParse("org.test.CounterFoo.doStuff"));
     counter.markEvents(10);
     counter.collectStatistics();
     return counter;
@@ -144,13 +140,13 @@ public class JsonBasicTest {
         return 24d;
       }
     };
-    GaugeMetric metric = new GaugeMetric(MetricName.parse("org.test.Foo.doStuff"), gauge);
+    GaugeMetric metric = new DefaultGaugeMetric(MetricManager.nameParse("org.test.GaugeFoo.doStuff"), gauge);
     metric.collectStatistics();
     return metric;
   }
   
   private ValueMetric createValueMetric() {
-    ValueMetric metric = new ValueMetric(MetricName.parse("org.test.Foo.doStuff"));
+    ValueMetric metric = new DefaultValueMetric(MetricManager.nameParse("org.test.ValueFoo.doStuff"));
     metric.addEvent(12);
     metric.addEvent(14);
     metric.addEvent(16);
@@ -159,7 +155,7 @@ public class JsonBasicTest {
   }
   
   private TimedMetric createTimedMetric() {
-    TimedMetric metric = new TimedMetric(MetricName.parse("org.test.Foo.doStuff"));
+    TimedMetric metric = new DefaultTimedMetric(MetricManager.nameParse("org.test.TimedFoo.doStuff"));
     metric.addEventDuration(true, 100000);
     metric.addEventDuration(true, 120000);
     metric.addEventDuration(true, 140000);
