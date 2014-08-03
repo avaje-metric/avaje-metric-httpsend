@@ -1,10 +1,14 @@
 package org.avaje.metric.httpsend;
 
+import java.io.IOException;
 import java.net.URL;
 import java.util.List;
 
 import com.squareup.okhttp.*;
+
 import org.avaje.metric.Metric;
+import org.avaje.metric.report.HeaderInfo;
+import org.avaje.metric.report.JsonWriteVisitor;
 import org.avaje.metric.report.MetricReporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,50 +26,41 @@ public class HttpSendReporter implements MetricReporter {
 
   protected URL url;
 
-  protected String key;
-
-  protected String app;
-
-  protected String env;
-
-  protected String server;
+  protected HeaderInfo headerInfo;
 
   public HttpSendReporter() {
 
   }
 
+  /**
+   * Set the URL of the repository the metrics are sent to.
+   */
   public void setUrl(URL url) {
     this.url = url;
   }
 
-  public void setKey(String key) {
-    this.key = stripQuotes(key);
+  /**
+   * Set the header information which identifies the specific source of the metrics.
+   */
+  public void setHeaderInfo(HeaderInfo headerInfo) {
+    this.headerInfo = headerInfo;
   }
 
-  public void setApp(String app) {
-    this.app = stripQuotes(app);
-  }
-
-  public void setEnv(String env) {
-    this.env = stripQuotes(env);
-  }
-
-  public void setServer(String server) {
-    this.server = stripQuotes(server);
-  }
-
-
+  /**
+   * Send the non-empty metrics that were collected to the remote repository.
+   */
   public void report(List<Metric> metrics) {
 
-    long collectionTime = System.currentTimeMillis();
-    String json = buildJsonPayload(metrics, collectionTime);
+    String json = null;
+    
+    try {  
+      long collectionTime = System.currentTimeMillis();
+      json = buildJsonPayload(metrics, collectionTime);
 
-    if (log.isTraceEnabled()) {
-      log.trace("Sending:\n {}", json);
-    }
-
-    try {
-
+      if (log.isTraceEnabled()) {
+        log.trace("Sending:\n {}", json);
+      }
+      
       RequestBody body = RequestBody.create(JSON, json);
       Request request = new Request.Builder()
         .url(url)
@@ -81,7 +76,9 @@ public class HttpSendReporter implements MetricReporter {
     } catch (Exception e) {
       // store json message in a file to resend later...
       log.error("Exception sending metrics to server", e);
-      storeJsonForResend(json);
+      if (json != null) {
+        storeJsonForResend(json);
+      }
     }
   }
 
@@ -97,13 +94,13 @@ public class HttpSendReporter implements MetricReporter {
   }
 
   protected void storeJsonForResend(String json) {
-    // currently not doing this;
+    // override this to support store and re-send 
   }
 
-  protected String buildJsonPayload(List<Metric> metrics, long collectionTime) {
+  protected String buildJsonPayload(List<Metric> metrics, long collectionTime) throws IOException {
 
-    JsonMetricVisitor jsonVisitor = new JsonMetricVisitor(collectionTime);
-    return jsonVisitor.buildJson(this, metrics);
+    JsonWriteVisitor jsonVisitor = new JsonWriteVisitor(collectionTime);
+    return jsonVisitor.buildJson(headerInfo, metrics);
   }
 
   public void cleanup() {
