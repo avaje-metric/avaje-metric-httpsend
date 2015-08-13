@@ -1,5 +1,5 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.avaje.metric</groupId>
@@ -27,7 +27,7 @@
       <artifactId>slf4j-api</artifactId>
       <version>[1.7,)</version>
     </dependency>
-    
+
     <dependency>
       <groupId>org.avaje.metric</groupId>
       <artifactId>avaje-metric-core</artifactId>
@@ -41,7 +41,7 @@
     </dependency>
 
     <!-- TEST -->
-    
+
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -57,12 +57,48 @@
     </dependency>
 
     <dependency>
-       <groupId>com.fasterxml.jackson.core</groupId>
-       <artifactId>jackson-core</artifactId>
-       <version>2.3.3</version>
-       <scope>test</scope>
-     </dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>2.3.3</version>
+      <scope>test</scope>
+    </dependency>
 
   </dependencies>
+
+  <build>
+    <plugins>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.9.1</version>
+        <configuration>
+          <doctitle>Avaje Metrics HttpSend</doctitle>
+          <source>1.7</source>
+          <doclet>org.avaje.doclet.PygmentsDoclet</doclet>
+          <docletArtifact>
+            <groupId>org.avaje</groupId>
+            <artifactId>pygments-doclet</artifactId>
+            <version>1.0.0</version>
+          </docletArtifact>
+          <additionalparam>
+            <!-- &#45;&#45;Xdoclint:none-->
+          </additionalparam>
+          <linksource>true</linksource>
+
+        </configuration>
+
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
 
 </project>
