@@ -14,6 +14,12 @@
     <version>2.0</version>
   </parent>
 
+  <scm>
+    <connection>scm:git:https://github.com/avaje-metric/avaje-metric-httpsend.git</connection>
+    <developerConnection>scm:git:https://github.com/avaje-metric/avaje-metric-httpsend.git</developerConnection>
+    <url>https://github.com/avaje-metric/avaje-metric-httpsend.git</url>
+  </scm>
+
   <dependencies>
 
     <dependency>
