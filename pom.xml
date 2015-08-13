@@ -3,7 +3,7 @@
 
   <groupId>org.avaje.metric</groupId>
   <artifactId>avaje-metric-httpsend</artifactId>
-  <version>4.1.1</version>
+  <version>4.1.2-SNAPSHOT</version>
   <name>avaje-metric-httpsend</name>
   <description>Reporter that sends the metrics to a repo via https</description>
 
